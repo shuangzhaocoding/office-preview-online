@@ -213,6 +213,11 @@ body {
   box-sizing: border-box;
 }
 
+/* 侧栏克隆页去掉了 section.docx，需单独保持纸张白底 */
+.preview-area.is-docx .docx-thumb-page-clone {
+  background: #fff !important;
+}
+
 .vue-office-excel,
 .vue-office-excel-main,
 .vue-office-excel .x-spreadsheet {
@@ -312,7 +317,9 @@ body {
 
 .vue-office-pptx .pptx-preview-wrapper {
   max-width: 100% !important;
-  overflow-x: hidden !important;
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+  scrollbar-gutter: stable;
 }
 
 .pptx-sidebar {
@@ -329,19 +336,12 @@ body {
   color: #fff;
 }
 
-.pptx-sidebar-title {
-  flex: 0 0 auto;
-  padding: 12px 12px 8px;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.72);
-  letter-spacing: 0.04em;
-}
-
 .pptx-sidebar-list {
   flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 4px 10px 12px;
+  padding: 10px 10px 12px;
 }
 
 .pptx-thumb {
@@ -355,6 +355,10 @@ body {
   color: inherit;
   cursor: pointer;
   text-align: left;
+}
+
+.pptx-thumb:last-child {
+  margin-bottom: 0;
 }
 
 .pptx-thumb-frame {

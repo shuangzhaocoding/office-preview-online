@@ -84,7 +84,6 @@
       </div>
 
       <aside v-if="showPageToolbar" class="pptx-sidebar">
-        <div class="pptx-sidebar-title">{{ pageSidebarTitle }}</div>
         <div ref="pptxSidebarList" class="pptx-sidebar-list">
           <button
             v-for="page in pageList"
@@ -481,12 +480,11 @@ export default {
     pageList() {
       return Array.from({ length: this.pageTotal }, (_, index) => index + 1)
     },
-    pageSidebarTitle() {
-      return this.previewType === 'pptx' ? '幻灯片' : '页面'
-    },
     showZoomControls() {
       return (
-        (this.previewType === 'docx' || this.previewType === 'pdf') &&
+        (this.previewType === 'docx' ||
+          this.previewType === 'pdf' ||
+          this.previewType === 'pptx') &&
         this.showPageToolbar
       )
     },
@@ -505,11 +503,13 @@ export default {
   mounted() {
     window.addEventListener('popstate', this.applyQuery)
     window.addEventListener('keydown', this.onPreviewKeydown, true)
+    window.addEventListener('resize', this.syncSidebarOverflow)
     document.addEventListener('copy', this.onPreviewCopy, true)
   },
   beforeUnmount() {
     window.removeEventListener('popstate', this.applyQuery)
     window.removeEventListener('keydown', this.onPreviewKeydown, true)
+    window.removeEventListener('resize', this.syncSidebarOverflow)
     document.removeEventListener('copy', this.onPreviewCopy, true)
     this.stopStatusTimer()
     this.unbindPageScroll()
@@ -807,6 +807,43 @@ export default {
         el.classList?.contains('pptx-preview-slide-wrapper'),
       )
     },
+    fitPptxSlideShapes() {
+      const wrapper = this.getPptxScrollEl()
+      const slides = this.getPptxSlides()
+      if (!wrapper || !slides.length) return
+      const classic = wrapper.offsetWidth - wrapper.clientWidth
+      const base = Math.max(1, wrapper.clientWidth - (classic > 0 ? 0 : 16))
+      const target = Math.max(1, Math.round(base * this.viewZoom))
+      if (target < 2) return
+      for (const slide of slides) {
+        const layers = Array.from(slide.children).filter(
+          (el) =>
+            el.classList.contains('slide-wrapper') ||
+            el.classList.contains('slide-master-wrapper') ||
+            el.classList.contains('slide-layout-wrapper'),
+        )
+        let nativeW = 0
+        let nativeH = 0
+        for (const layer of layers) {
+          nativeW = Math.max(nativeW, parseFloat(layer.style.width) || 0)
+          nativeH = Math.max(nativeH, parseFloat(layer.style.height) || 0)
+          layer.querySelectorAll('.shape-wrapper, .group').forEach((el) => {
+            nativeW = Math.max(
+              nativeW,
+              (parseFloat(el.style.left) || 0) + (parseFloat(el.style.width) || 0),
+            )
+          })
+        }
+        if (nativeW < 2) continue
+        const zoom = target / nativeW
+        slide.style.width = `${target}px`
+        if (nativeH) slide.style.height = `${Math.round(nativeH * zoom)}px`
+        for (const layer of layers) {
+          layer.style.transform = 'none'
+          layer.style.zoom = String(zoom)
+        }
+      }
+    },
     getDocxRoot() {
       return document.querySelector('.preview-area > .vue-office-docx')
     },
@@ -836,6 +873,9 @@ export default {
       // CSS zoom，避免 setScale 整页重绘导致闪屏/缩略图变黑
       wrapper.style.zoom = String(this.viewZoom)
     },
+    applyPptxZoom() {
+      this.fitPptxSlideShapes()
+    },
     applyViewZoom() {
       if (this.previewType === 'docx') {
         this.applyDocxZoom()
@@ -843,6 +883,10 @@ export default {
       }
       if (this.previewType === 'pdf') {
         this.applyPdfZoom()
+        return
+      }
+      if (this.previewType === 'pptx') {
+        this.applyPptxZoom()
       }
     },
     setViewZoom(next) {
@@ -867,7 +911,9 @@ export default {
           ? this.getPdfScrollEl()
           : this.previewType === 'docx'
             ? this.getDocxScrollEl()
-            : null
+            : this.previewType === 'pptx'
+              ? this.getPptxScrollEl()
+              : null
       if (!root) return
       this.zoomWheelEl = root
       this.onViewWheel = (event) => {
@@ -1027,6 +1073,13 @@ export default {
       const top = active.offsetTop - list.clientHeight / 2 + active.clientHeight / 2
       list.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
     },
+    syncSidebarOverflow() {
+      const list = this.$refs.pptxSidebarList
+      if (!list) return
+      list.style.overflowY = 'hidden'
+      const overflowing = list.scrollHeight > list.clientHeight + 1
+      list.style.overflowY = overflowing ? 'auto' : 'hidden'
+    },
     capturePptxThumb(page, slideEl) {
       if (!slideEl || this.pptxReadyPages[page]) return
       const host = document.querySelector(`.pptx-sidebar [data-thumb-page="${page}"]`)
@@ -1122,6 +1175,7 @@ export default {
       this.pptxReadyPages = { ...this.pptxReadyPages, [page]: true }
     },
     refreshPptxThumbs() {
+      this.fitPptxSlideShapes()
       const slides = this.getPptxSlides()
       const limit = this.pptxTotalPages > 0 ? this.pptxTotalPages : slides.length
       for (let index = 0; index < Math.min(slides.length, limit); index += 1) {
@@ -1149,6 +1203,7 @@ export default {
     startThumbCapture() {
       this.stopThumbCapture()
       this.$nextTick(() => {
+        this.syncSidebarOverflow()
         if (this.previewType === 'pdf') {
           this.refreshPdfThumbs()
           this.pptxThumbTimer = window.setInterval(() => {
@@ -1311,8 +1366,10 @@ export default {
         this.pptxPageInput = '1'
         this.pptxReadyPages = {}
         this.$nextTick(() => {
+          this.fitPptxSlideShapes()
           this.bindPageScroll()
           this.startThumbCapture()
+          this.bindViewZoom()
         })
       } else if (this.previewType === 'pdf') {
         // PDF virtual list re-emits rendered as pages load; init once, then only refresh thumbs.
