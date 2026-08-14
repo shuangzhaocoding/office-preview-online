@@ -1,6 +1,6 @@
 # Office Preview
-# 1) 在镜像内执行 npm run build
-# 2) 安装 nginx，托管 dist 静态目录
+# 1) 复制本地已构建的前端 dist（需先执行 npm run build）
+# 2) 安装 nginx，托管静态目录
 #
 # 构建：docker build -f Dockerfile_yugong -t office-preview:latest .
 # 运行：docker run -d -p 8080:80 office-preview:latest
@@ -69,21 +69,7 @@ http {
 }
 EOF
 
-WORKDIR /app
-
-COPY package.json package-lock.json ./
-RUN npm config set registry https://mirrors.huaweicloud.com/repository/npm/ \
- && npm config set fetch-retries 5 \
- && npm config set fetch-retry-mintimeout 20000 \
- && npm config set fetch-retry-maxtimeout 120000 \
- && npm config set fetch-timeout 300000 \
- && npm ci
-
-COPY . .
-RUN npm run build \
-    && rm -rf /usr/share/nginx/html/* \
-    && cp -r dist/. /usr/share/nginx/html/ \
-    && rm -rf /app
+COPY dist /usr/share/nginx/html
 
 EXPOSE 80
 
