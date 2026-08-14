@@ -285,8 +285,20 @@ body {
 }
 
 .toolbar-zoom-label {
-  min-width: 64px;
+  min-width: 52px;
+  text-align: center;
   font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.preview-area.is-pdf > .vue-office-pdf {
+  overflow-x: auto;
+}
+
+.preview-area.is-pdf .pptx-sidebar {
+  z-index: 20;
+  background: #14181f;
 }
 
 .toolbar-input::-webkit-outer-spin-button,

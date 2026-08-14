@@ -122,26 +122,27 @@
           下一页
         </button>
 
-        <template v-if="previewType === 'docx'">
+        <template v-if="showZoomControls">
           <span class="toolbar-divider" aria-hidden="true" />
           <button
             type="button"
             class="toolbar-btn"
-            :disabled="docxZoom <= DOCX_ZOOM_MIN"
-            @click="zoomDocxBy(-DOCX_ZOOM_STEP)"
+            :disabled="viewZoom <= VIEW_ZOOM_MIN"
+            @click="zoomViewBy(-VIEW_ZOOM_STEP)"
           >
             缩小
           </button>
-          <button type="button" class="toolbar-btn toolbar-zoom-label" @click="resetDocxZoom">
-            {{ docxZoomPercent }}%
-          </button>
+          <span class="toolbar-zoom-label">{{ viewZoomPercent }}%</span>
           <button
             type="button"
             class="toolbar-btn"
-            :disabled="docxZoom >= DOCX_ZOOM_MAX"
-            @click="zoomDocxBy(DOCX_ZOOM_STEP)"
+            :disabled="viewZoom >= VIEW_ZOOM_MAX"
+            @click="zoomViewBy(VIEW_ZOOM_STEP)"
           >
             放大
+          </button>
+          <button type="button" class="toolbar-btn" :disabled="viewZoom === VIEW_ZOOM_DEFAULT" @click="resetViewZoom">
+            重置
           </button>
         </template>
       </div>
@@ -222,10 +223,10 @@ const RING_RADIUS = 54
 const RING_LENGTH = 2 * Math.PI * RING_RADIUS
 const PPTX_SIDEBAR_WIDTH = 148
 const PPTX_TOOLBAR_HEIGHT = 52
-const DOCX_ZOOM_MIN = 0.5
-const DOCX_ZOOM_MAX = 2.5
-const DOCX_ZOOM_STEP = 0.1
-const DOCX_ZOOM_DEFAULT = 1
+const VIEW_ZOOM_MIN = 0.5
+const VIEW_ZOOM_MAX = 2.5
+const VIEW_ZOOM_STEP = 0.1
+const VIEW_ZOOM_DEFAULT = 1
 
 const SITE_THEME = {
   docx: { color: '#2B579A', label: 'W', title: 'Word 预览' },
@@ -305,11 +306,12 @@ export default {
       pptxThumbTimer: null,
       pptxSlideObserver: null,
       pdfInited: false,
-      docxZoom: DOCX_ZOOM_DEFAULT,
-      docxWheelEl: null,
-      DOCX_ZOOM_MIN,
-      DOCX_ZOOM_MAX,
-      DOCX_ZOOM_STEP,
+      viewZoom: VIEW_ZOOM_DEFAULT,
+      zoomWheelEl: null,
+      VIEW_ZOOM_MIN,
+      VIEW_ZOOM_MAX,
+      VIEW_ZOOM_STEP,
+      VIEW_ZOOM_DEFAULT,
       requestOptions: {
         headers: {},
       },
@@ -387,8 +389,14 @@ export default {
     pageSidebarTitle() {
       return this.previewType === 'pptx' ? '幻灯片' : '页面'
     },
-    docxZoomPercent() {
-      return Math.round(this.docxZoom * 100)
+    showZoomControls() {
+      return (
+        (this.previewType === 'docx' || this.previewType === 'pdf') &&
+        this.showPageToolbar
+      )
+    },
+    viewZoomPercent() {
+      return Math.round(this.viewZoom * 100)
     },
   },
   watch: {
@@ -403,7 +411,7 @@ export default {
     this.stopStatusTimer()
     this.unbindPageScroll()
     this.stopThumbCapture()
-    this.unbindDocxZoom()
+    this.unbindViewZoom()
   },
   methods: {
     applyQuery() {
@@ -438,10 +446,10 @@ export default {
       this.pptxTotalPages = 0
       this.pptxReadyPages = {}
       this.pdfInited = false
-      this.docxZoom = DOCX_ZOOM_DEFAULT
+      this.viewZoom = VIEW_ZOOM_DEFAULT
       this.unbindPageScroll()
       this.stopThumbCapture()
-      this.unbindDocxZoom()
+      this.unbindViewZoom()
       if (previewType === 'pptx') {
         this.pptxOptions = getPptxLayoutSize()
       }
@@ -584,41 +592,66 @@ export default {
       const wrapper = this.getDocxWrapper()
       if (!wrapper) return
       // 只缩放文档显示区域，侧栏/底栏不受影响
-      wrapper.style.zoom = String(this.docxZoom)
+      wrapper.style.zoom = String(this.viewZoom)
     },
-    setDocxZoom(next) {
-      const zoom = Math.min(DOCX_ZOOM_MAX, Math.max(DOCX_ZOOM_MIN, Number(next) || DOCX_ZOOM_DEFAULT))
-      this.docxZoom = Math.round(zoom * 100) / 100
-      this.applyDocxZoom()
+    applyPdfZoom() {
+      const wrapper = this.getPdfWrapper()
+      if (!wrapper) return
+      // CSS zoom，避免 setScale 整页重绘导致闪屏/缩略图变黑
+      wrapper.style.zoom = String(this.viewZoom)
     },
-    zoomDocxBy(delta) {
-      this.setDocxZoom(this.docxZoom + delta)
+    applyViewZoom() {
+      if (this.previewType === 'docx') {
+        this.applyDocxZoom()
+        return
+      }
+      if (this.previewType === 'pdf') {
+        this.applyPdfZoom()
+      }
     },
-    resetDocxZoom() {
-      this.setDocxZoom(DOCX_ZOOM_DEFAULT)
+    setViewZoom(next) {
+      const zoom = Math.min(
+        VIEW_ZOOM_MAX,
+        Math.max(VIEW_ZOOM_MIN, Number(next) || VIEW_ZOOM_DEFAULT),
+      )
+      this.viewZoom = Math.round(zoom * 100) / 100
+      this.applyViewZoom()
     },
-    bindDocxZoom() {
-      this.unbindDocxZoom()
-      this.applyDocxZoom()
-      const root = this.getDocxScrollEl()
+    zoomViewBy(delta) {
+      this.setViewZoom(this.viewZoom + delta)
+    },
+    resetViewZoom() {
+      this.setViewZoom(VIEW_ZOOM_DEFAULT)
+    },
+    bindViewZoom() {
+      this.unbindViewZoom()
+      this.applyViewZoom()
+      const root =
+        this.previewType === 'pdf'
+          ? this.getPdfScrollEl()
+          : this.previewType === 'docx'
+            ? this.getDocxScrollEl()
+            : null
       if (!root) return
-      this.docxWheelEl = root
-      this.onDocxWheel = (event) => {
+      this.zoomWheelEl = root
+      this.onViewWheel = (event) => {
         if (!(event.ctrlKey || event.metaKey)) return
         event.preventDefault()
-        const delta = event.deltaY > 0 ? -DOCX_ZOOM_STEP : DOCX_ZOOM_STEP
-        this.zoomDocxBy(delta)
+        const delta = event.deltaY > 0 ? -VIEW_ZOOM_STEP : VIEW_ZOOM_STEP
+        this.zoomViewBy(delta)
       }
-      root.addEventListener('wheel', this.onDocxWheel, { passive: false })
+      root.addEventListener('wheel', this.onViewWheel, { passive: false })
     },
-    unbindDocxZoom() {
-      if (this.docxWheelEl && this.onDocxWheel) {
-        this.docxWheelEl.removeEventListener('wheel', this.onDocxWheel)
+    unbindViewZoom() {
+      if (this.zoomWheelEl && this.onViewWheel) {
+        this.zoomWheelEl.removeEventListener('wheel', this.onViewWheel)
       }
-      this.docxWheelEl = null
-      this.onDocxWheel = null
-      const wrapper = this.getDocxWrapper()
-      if (wrapper) wrapper.style.zoom = ''
+      this.zoomWheelEl = null
+      this.onViewWheel = null
+      const docxWrapper = this.getDocxWrapper()
+      if (docxWrapper) docxWrapper.style.zoom = ''
+      const pdfWrapper = this.getPdfWrapper()
+      if (pdfWrapper) pdfWrapper.style.zoom = ''
     },
     getPdfRoot() {
       return document.querySelector('.preview-area > .vue-office-pdf')
@@ -647,11 +680,13 @@ export default {
       const contentH = parseFloat(wrapper.style.height) || 0
       if (!contentH) return null
       const total = Math.max(1, Math.round((contentH + gap) / (pageH + gap)))
+      const zoom = parseFloat(wrapper.style.zoom) || this.viewZoom || 1
       return {
         pageH,
         gap,
         stride: pageH + gap,
         total,
+        zoom,
         padding: parseInt(getComputedStyle(wrapper).paddingTop, 10) || 0,
       }
     },
@@ -735,9 +770,10 @@ export default {
       const scrollEl = this.pptxScrollEl || this.getPdfScrollEl()
       const metrics = this.getPdfMetrics()
       if (!scrollEl || !metrics) return
+      const zoom = metrics.zoom || 1
       const current = Math.min(
         metrics.total,
-        Math.max(1, Math.floor((scrollEl.scrollTop + 8) / metrics.stride) + 1),
+        Math.max(1, Math.floor((scrollEl.scrollTop / zoom + 8) / metrics.stride) + 1),
       )
       this.pptxPage = current
       if (document.activeElement?.classList?.contains('toolbar-input')) return
@@ -803,6 +839,24 @@ export default {
       const host = document.querySelector(`.pptx-sidebar [data-thumb-page="${page}"]`)
       if (!host) return
       if (canvas.width < 2 || canvas.height < 2) return
+
+      // 跳过尚未绘制完成的空白/近黑画布，避免侧栏变黑
+      try {
+        const ctx = canvas.getContext('2d', { willReadFrequently: true })
+        if (ctx) {
+          const sample = ctx.getImageData(
+            Math.floor(canvas.width / 2),
+            Math.floor(canvas.height / 2),
+            1,
+            1,
+          ).data
+          const [r, g, b, a] = sample
+          if (a < 10 || r + g + b < 24) return
+        }
+      } catch {
+        // ignore cross-origin / security errors and still try dataURL
+      }
+
       let dataUrl = ''
       try {
         dataUrl = canvas.toDataURL('image/jpeg', 0.72)
@@ -959,8 +1013,9 @@ export default {
       this.pptxPage = target
       const scrollEl = this.getPdfScrollEl()
       if (!scrollEl) return
+      const zoom = metrics.zoom || 1
       scrollEl.scrollTo({
-        top: (target - 1) * metrics.stride,
+        top: (target - 1) * metrics.stride * zoom,
         behavior: 'smooth',
       })
     },
@@ -1030,6 +1085,7 @@ export default {
             this.$nextTick(() => {
               this.bindPageScroll()
               this.startThumbCapture()
+              this.bindViewZoom()
             })
           }
         } else {
@@ -1042,12 +1098,12 @@ export default {
           this.pptxPage = 1
           this.pptxPageInput = '1'
           this.pptxReadyPages = {}
-          this.docxZoom = DOCX_ZOOM_DEFAULT
+          this.viewZoom = VIEW_ZOOM_DEFAULT
           if (total > 0) {
             this.bindPageScroll()
             this.startThumbCapture()
             this.$nextTick(() => {
-              this.bindDocxZoom()
+              this.bindViewZoom()
             })
           }
         })
@@ -1058,11 +1114,11 @@ export default {
       this.stopStatusTimer()
       this.unbindPageScroll()
       this.stopThumbCapture()
-      this.unbindDocxZoom()
+      this.unbindViewZoom()
       this.pptxTotalPages = 0
       this.pptxReadyPages = {}
       this.pdfInited = false
-      this.docxZoom = DOCX_ZOOM_DEFAULT
+      this.viewZoom = VIEW_ZOOM_DEFAULT
       console.error('渲染失败', error)
       this.loading = false
       this.hint = error?.message || '文件渲染失败，请检查 url 是否可访问，以及 resource_type 是否匹配。'
