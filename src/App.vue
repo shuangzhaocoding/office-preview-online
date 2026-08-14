@@ -1,12 +1,48 @@
 <template>
-  <div id="app-wrapper">
-    <div v-if="hint && !src" class="hint">
-      <h1>Office 文件预览</h1>
-      <p>{{ hint }}</p>
-      <p class="example">
-        示例：
-        <code>/?url=https%3A%2F%2Fexample.com%2Ffile.docx&amp;resource_type=docx</code>
-      </p>
+  <div id="app-wrapper" :class="{ 'is-home': showHome }">
+    <div v-if="showHome" class="home">
+      <div class="home-card">
+        <div class="home-marks" aria-hidden="true">
+          <span class="home-mark" style="--mark: #2B579A">W</span>
+          <span class="home-mark" style="--mark: #217346">X</span>
+          <span class="home-mark" style="--mark: #E5252A">P</span>
+          <span class="home-mark" style="--mark: #C43E1C">T</span>
+        </div>
+        <h1>Office 文件预览</h1>
+        <p class="home-lead">
+          在浏览器中直接预览 Word、Excel、PDF 与 PPT，无需安装办公软件。
+        </p>
+
+        <form class="home-form" @submit.prevent="submitHome">
+          <label class="home-field">
+            <span>文件地址</span>
+            <input
+              v-model="homeUrl"
+              class="home-input"
+              type="text"
+              inputmode="url"
+              autocomplete="off"
+              placeholder="https://example.com/file.docx"
+            />
+          </label>
+
+          <label class="home-field home-field-type">
+            <span>文件类型</span>
+            <select v-model="homeType" class="home-select">
+              <option value="auto">自动推断</option>
+              <option value="docx">Word（docx）</option>
+              <option value="excel">Excel（xlsx / xls）</option>
+              <option value="pdf">PDF</option>
+              <option value="pptx">PPT（pptx）</option>
+            </select>
+          </label>
+
+          <p v-if="homeTypeHint" class="home-hint-ok">{{ homeTypeHint }}</p>
+          <p v-if="homeError" class="home-hint-err">{{ homeError }}</p>
+
+          <button type="submit" class="home-submit">预览</button>
+        </form>
+      </div>
     </div>
 
     <div
@@ -289,6 +325,9 @@ export default {
       loadingText: '正在下载...',
       elapsedText: '0.000s',
       hint: '',
+      homeUrl: '',
+      homeType: 'auto',
+      homeError: '',
       src: '',
       originalUrl: '',
       usedProxy: false,
@@ -328,6 +367,16 @@ export default {
     }
   },
   computed: {
+    showHome() {
+      return !this.originalUrl && !this.src && !this.loading
+    },
+    homeTypeHint() {
+      if (this.homeType !== 'auto') return ''
+      const inferred = inferTypeFromUrl(this.homeUrl.trim())
+      if (!inferred) return ''
+      const labels = { docx: 'Word', excel: 'Excel', pdf: 'PDF', pptx: 'PPT' }
+      return `已识别为 ${labels[inferred] || inferred}`
+    },
     downloadPercent() {
       if (!this.downloadTotal) return 0
       return Math.min(100, (this.downloadReceived / this.downloadTotal) * 100)
@@ -407,7 +456,11 @@ export default {
   created() {
     this.applyQuery()
   },
+  mounted() {
+    window.addEventListener('popstate', this.applyQuery)
+  },
   beforeUnmount() {
+    window.removeEventListener('popstate', this.applyQuery)
     this.stopStatusTimer()
     this.unbindPageScroll()
     this.stopThumbCapture()
@@ -417,8 +470,11 @@ export default {
     applyQuery() {
       const { url, resourceType } = readLocationParams()
       if (!url) {
-        this.hint = '请在地址栏提供参数 url 和 resource_type。'
+        this.originalUrl = ''
+        this.src = ''
+        this.hint = ''
         this.loading = false
+        this.previewType = ''
         applySiteChrome('')
         return
       }
@@ -426,13 +482,19 @@ export default {
       const normalized = (resourceType || '').toLowerCase().replace(/^\./, '')
       const previewType = TYPE_MAP[normalized] || inferTypeFromUrl(url)
       if (!previewType) {
-        this.hint = `不支持的 resource_type：${resourceType || '(空)'}。支持 docx / excel / pdf / pptx。`
+        this.originalUrl = ''
+        this.src = ''
+        this.homeUrl = url
+        this.homeType = 'auto'
+        this.homeError = `无法识别文件类型，请手动选择。支持 Word / Excel / PDF / PPT。`
         this.loading = false
+        this.previewType = ''
         applySiteChrome('')
         return
       }
 
       this.hint = ''
+      this.homeError = ''
       this.previewType = previewType
       applySiteChrome(previewType)
       this.excelOptions.xls = normalized === 'xls'
@@ -457,6 +519,31 @@ export default {
       this.loadingText = '正在下载... 0.000s'
       this.elapsedText = '0.000s'
       this.loadFile(url)
+    },
+    submitHome() {
+      const raw = this.homeUrl.trim()
+      this.homeError = ''
+      if (!raw) {
+        this.homeError = '请输入文件地址'
+        return
+      }
+      const url = /^[a-z][a-z0-9+.-]*:/i.test(raw) ? raw : `https://${raw}`
+      try {
+        // eslint-disable-next-line no-new
+        new URL(url)
+      } catch {
+        this.homeError = '请输入有效的 URL'
+        return
+      }
+      this.homeUrl = url
+      const type = this.homeType === 'auto' ? inferTypeFromUrl(url) : this.homeType
+      if (!type) {
+        this.homeError = '无法从地址识别类型，请手动选择'
+        return
+      }
+      const params = new URLSearchParams({ url, resource_type: type })
+      window.history.pushState({}, '', `?${params.toString()}`)
+      this.applyQuery()
     },
     async loadFile(url) {
       try {

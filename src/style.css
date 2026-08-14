@@ -20,26 +20,134 @@ body {
   color: #1f1f1f;
 }
 
-.hint {
-  max-width: 720px;
-  margin: 80px auto;
-  padding: 0 24px;
-  line-height: 1.6;
+#app-wrapper.is-home {
+  overflow-y: auto;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(43, 87, 154, 0.12), transparent 55%),
+    radial-gradient(ellipse 50% 40% at 100% 100%, rgba(196, 62, 28, 0.08), transparent 50%),
+    #f4f5f7;
 }
 
-.hint h1 {
-  font-size: 22px;
-  margin-bottom: 12px;
+.home {
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 20px;
 }
 
-.hint .example {
-  margin-top: 16px;
-  color: #5f6368;
-  word-break: break-all;
+.home-card {
+  width: 100%;
+  max-width: 560px;
+  padding: 40px 36px 36px;
+  background: #fff;
+  border-radius: 20px;
+  box-shadow:
+    0 1px 2px rgba(20, 24, 31, 0.04),
+    0 16px 40px rgba(20, 24, 31, 0.08);
 }
 
-.hint code {
+.home-marks {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.home-mark {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: var(--mark);
+  color: #fff;
   font-size: 13px;
+  font-weight: 700;
+}
+
+.home-card h1 {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  margin-bottom: 8px;
+}
+
+.home-lead {
+  color: #5f6368;
+  font-size: 14px;
+  line-height: 1.7;
+  margin-bottom: 28px;
+}
+
+.home-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.home-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.home-field span {
+  font-size: 12px;
+  font-weight: 600;
+  color: #3c4043;
+}
+
+.home-input,
+.home-select {
+  width: 100%;
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid #dadce0;
+  border-radius: 10px;
+  background: #fff;
+  color: #1f1f1f;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.home-input:focus,
+.home-select:focus {
+  border-color: #2b579a;
+  box-shadow: 0 0 0 3px rgba(43, 87, 154, 0.15);
+}
+
+.home-hint-ok,
+.home-hint-err {
+  margin: -4px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.home-hint-ok {
+  color: #217346;
+}
+
+.home-hint-err {
+  color: #c5221f;
+}
+
+.home-submit {
+  appearance: none;
+  height: 44px;
+  margin-top: 6px;
+  border: 0;
+  border-radius: 10px;
+  background: #1f2933;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.home-submit:hover {
+  background: #111827;
 }
 
 .preview-area {
