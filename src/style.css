@@ -220,6 +220,96 @@ body {
   height: 100% !important;
 }
 
+.excel-find-bar {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 6px 10px;
+  background: #fff;
+  border: 1px solid rgba(20, 24, 31, 0.12);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(20, 24, 31, 0.16);
+}
+
+.excel-find-input {
+  width: 180px;
+  height: 30px;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  padding: 0 8px;
+  font-size: 13px;
+  outline: none;
+  color: #1f1f1f;
+}
+
+.excel-find-input:focus {
+  border-color: #217346;
+  box-shadow: 0 0 0 3px rgba(33, 115, 70, 0.16);
+}
+
+.excel-find-count {
+  min-width: 88px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: #667085;
+  font-variant-numeric: tabular-nums;
+}
+
+.excel-find-btn {
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  background: #f8f9fb;
+  color: #1f1f1f;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.excel-find-btn:hover:not(:disabled) {
+  background: #eef2f6;
+}
+
+.excel-find-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.excel-find-close {
+  font-size: 16px;
+}
+
+.preview-area.excel-finding .x-spreadsheet-selector-area {
+  border-color: #e6b800 !important;
+  background: rgba(255, 213, 0, 0.38) !important;
+}
+
+.excel-copy-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 28px;
+  z-index: 45;
+  transform: translateX(-50%);
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: rgba(20, 24, 31, 0.92);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.3;
+  white-space: nowrap;
+  box-shadow: 0 8px 20px rgba(20, 24, 31, 0.22);
+  pointer-events: none;
+}
+
 .vue-office-pptx .pptx-preview-wrapper {
   max-width: 100% !important;
   overflow-x: hidden !important;
@@ -402,6 +492,67 @@ body {
 
 .preview-area.is-pdf > .vue-office-pdf {
   overflow-x: auto;
+}
+
+.vue-office-pdf-page {
+  position: absolute;
+  overflow: hidden;
+}
+
+.vue-office-pdf-page canvas {
+  display: block;
+  user-select: none;
+  pointer-events: none;
+}
+
+.vue-office-pdf-page .textLayer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: hidden;
+  line-height: 1;
+  letter-spacing: normal;
+  word-spacing: normal;
+  text-align: initial;
+  z-index: 2;
+  opacity: 1;
+  text-size-adjust: none;
+  transform-origin: 0 0;
+  pointer-events: auto;
+  box-sizing: content-box;
+}
+
+.vue-office-pdf-page .textLayer span,
+.vue-office-pdf-page .textLayer br {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  line-height: 1;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  box-sizing: content-box;
+  letter-spacing: normal;
+  word-spacing: normal;
+}
+
+/* markedContent is also a span; keep descendants in page coordinates. */
+.vue-office-pdf-page .textLayer .markedContent {
+  display: contents;
+}
+
+/* Browser find-highlight uses the layout box, which includes descent below
+   the baseline. Canvas glyphs sit on the baseline, so the overlay looks low. */
+.vue-office-pdf-page .textLayer span:not(.markedContent) {
+  margin-top: -0.12em;
+  text-box-trim: trim-end;
+  text-box-edge: auto alphabetic;
+}
+
+.vue-office-pdf-page .textLayer ::selection {
+  background: rgba(0, 100, 255, 0.28);
 }
 
 .preview-area.is-pdf .pptx-sidebar {

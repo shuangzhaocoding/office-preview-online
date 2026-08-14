@@ -53,6 +53,8 @@
         'is-pptx': previewType === 'pptx',
         'is-pdf': previewType === 'pdf',
         'is-docx': previewType === 'docx',
+        'is-excel': previewType === 'excel',
+        'excel-finding': previewType === 'excel' && excelFindOpen && excelFindHits.length > 0,
       }"
     >
       <div v-if="loading || hint" class="loading-overlay" :class="{ error: !!hint }">
@@ -134,6 +136,30 @@
         @error="errorHandler"
       />
 
+      <div
+        v-if="previewType === 'excel' && excelFindOpen"
+        class="excel-find-bar"
+        @mousedown.stop
+        @click.stop
+      >
+        <input
+          ref="excelFindInput"
+          v-model="excelFindQuery"
+          class="excel-find-input"
+          type="search"
+          placeholder="查找"
+          autocomplete="off"
+          @input="runExcelFind"
+          @keydown="onExcelFindKeydown"
+        />
+        <span class="excel-find-count">{{ excelFindCountText }}</span>
+        <button type="button" class="excel-find-btn" title="上一个" :disabled="!excelFindHits.length" @click="stepExcelFind(-1)">↑</button>
+        <button type="button" class="excel-find-btn" title="下一个" :disabled="!excelFindHits.length" @click="stepExcelFind(1)">↓</button>
+        <button type="button" class="excel-find-btn excel-find-close" title="关闭" @click="closeExcelFind">×</button>
+      </div>
+
+      <div v-if="excelCopyToast" class="excel-copy-toast" role="status">{{ excelCopyToast }}</div>
+
       <div v-if="showPageToolbar" class="pptx-toolbar">
         <button type="button" class="toolbar-btn" :disabled="pageCurrent <= 1" @click="goPage(pageCurrent - 1)">上一页</button>
         <div class="toolbar-page">
@@ -190,6 +216,13 @@
 import { defineAsyncComponent } from 'vue'
 import '@vue-office/docx/lib/index.css'
 import '@vue-office/excel/lib/index.css'
+import {
+  cellAddress,
+  collectExcelMatches,
+  getExcelSelection,
+  getExcelSpreadsheet,
+  gotoExcelCell,
+} from './excelPreview.js'
 
 const TYPE_MAP = {
   docx: 'docx',
@@ -364,6 +397,12 @@ export default {
         beforeTransformData: (workbookData) => workbookData,
         transformData: (workbookData) => workbookData,
       },
+      excelFindOpen: false,
+      excelFindQuery: '',
+      excelFindHits: [],
+      excelFindIndex: 0,
+      excelCopyToast: '',
+      excelCopyTimer: null,
     }
   },
   computed: {
@@ -376,6 +415,13 @@ export default {
       if (!inferred) return ''
       const labels = { docx: 'Word', excel: 'Excel', pdf: 'PDF', pptx: 'PPT' }
       return `已识别为 ${labels[inferred] || inferred}`
+    },
+    excelFindCountText() {
+      if (!this.excelFindQuery.trim()) return ''
+      if (!this.excelFindHits.length) return '无结果'
+      const hit = this.excelFindHits[this.excelFindIndex]
+      const where = hit ? `${hit.sheetName}!${cellAddress(hit.ri, hit.ci)}` : ''
+      return `${this.excelFindIndex + 1}/${this.excelFindHits.length}${where ? `  ${where}` : ''}`
     },
     downloadPercent() {
       if (!this.downloadTotal) return 0
@@ -458,15 +504,117 @@ export default {
   },
   mounted() {
     window.addEventListener('popstate', this.applyQuery)
+    window.addEventListener('keydown', this.onPreviewKeydown, true)
+    document.addEventListener('copy', this.onPreviewCopy, true)
   },
   beforeUnmount() {
     window.removeEventListener('popstate', this.applyQuery)
+    window.removeEventListener('keydown', this.onPreviewKeydown, true)
+    document.removeEventListener('copy', this.onPreviewCopy, true)
     this.stopStatusTimer()
     this.unbindPageScroll()
     this.stopThumbCapture()
     this.unbindViewZoom()
+    this.closeExcelFind()
+    this.clearExcelCopyToast()
   },
   methods: {
+    onPreviewKeydown(event) {
+      if (this.previewType !== 'excel' || this.loading) return
+      const key = event.key.toLowerCase()
+      const mod = event.ctrlKey || event.metaKey
+      if (mod && key === 'f') {
+        event.preventDefault()
+        event.stopPropagation()
+        this.openExcelFind()
+        return
+      }
+      if (this.excelFindOpen && key === 'escape') {
+        event.preventDefault()
+        this.closeExcelFind()
+        return
+      }
+      if (this.excelFindOpen && key === 'f3') {
+        event.preventDefault()
+        this.stepExcelFind(event.shiftKey ? -1 : 1)
+      }
+    },
+    onPreviewCopy(event) {
+      if (this.previewType !== 'excel' || this.loading) return
+      const target = event.target
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return
+      }
+      const selection = getExcelSelection(getExcelSpreadsheet())
+      if (!selection) {
+        this.showExcelCopyToast('没有可复制的内容')
+        return
+      }
+      event.preventDefault()
+      event.stopPropagation()
+      event.clipboardData?.setData('text/plain', selection.text)
+      const cells = selection.rowCount * selection.colCount
+      const size =
+        cells === 1
+          ? selection.address
+          : `${selection.address}（${selection.rowCount}×${selection.colCount}）`
+      this.showExcelCopyToast(`已复制 ${size}`)
+    },
+    showExcelCopyToast(message) {
+      this.excelCopyToast = message
+      if (this.excelCopyTimer) clearTimeout(this.excelCopyTimer)
+      this.excelCopyTimer = setTimeout(() => {
+        this.excelCopyToast = ''
+        this.excelCopyTimer = null
+      }, 1800)
+    },
+    clearExcelCopyToast() {
+      if (this.excelCopyTimer) {
+        clearTimeout(this.excelCopyTimer)
+        this.excelCopyTimer = null
+      }
+      this.excelCopyToast = ''
+    },
+    openExcelFind() {
+      this.excelFindOpen = true
+      this.$nextTick(() => {
+        const input = this.$refs.excelFindInput
+        if (input) {
+          input.focus()
+          input.select()
+        }
+        if (this.excelFindQuery.trim()) this.runExcelFind()
+      })
+    },
+    closeExcelFind() {
+      this.excelFindOpen = false
+      this.excelFindHits = []
+      this.excelFindIndex = 0
+    },
+    runExcelFind() {
+      const xs = getExcelSpreadsheet()
+      this.excelFindHits = collectExcelMatches(xs, this.excelFindQuery)
+      this.excelFindIndex = 0
+      if (this.excelFindHits.length) {
+        gotoExcelCell(xs, this.excelFindHits[0])
+      }
+    },
+    stepExcelFind(delta) {
+      const hits = this.excelFindHits
+      if (!hits.length) return
+      const next = (this.excelFindIndex + delta + hits.length) % hits.length
+      this.excelFindIndex = next
+      gotoExcelCell(getExcelSpreadsheet(), hits[next])
+    },
+    onExcelFindKeydown(event) {
+      if (event.key === 'Enter') {
+        event.preventDefault()
+        this.stepExcelFind(event.shiftKey ? -1 : 1)
+      } else if (event.key === 'Escape') {
+        event.preventDefault()
+        this.closeExcelFind()
+      }
+    },
     applyQuery() {
       const { url, resourceType } = readLocationParams()
       if (!url) {
@@ -509,6 +657,7 @@ export default {
       this.pptxReadyPages = {}
       this.pdfInited = false
       this.viewZoom = VIEW_ZOOM_DEFAULT
+      this.closeExcelFind()
       this.unbindPageScroll()
       this.stopThumbCapture()
       this.unbindViewZoom()
@@ -752,8 +901,8 @@ export default {
     getPdfCanvases() {
       const wrapper = this.getPdfWrapper()
       if (!wrapper) return []
-      return Array.from(wrapper.children).filter(
-        (el) => el.tagName === 'CANVAS' && el.hasAttribute('data-id'),
+      return Array.from(
+        wrapper.querySelectorAll('.vue-office-pdf-page canvas, :scope > canvas[data-id]'),
       )
     },
     getPdfMetrics() {
@@ -761,7 +910,11 @@ export default {
       if (!wrapper) return null
       const canvas = this.getPdfCanvases()[0]
       if (!canvas) return null
-      const pageH = parseFloat(canvas.style.height) || canvas.clientHeight
+      const pageBox = canvas.closest('.vue-office-pdf-page')
+      const pageH =
+        parseFloat(pageBox?.style.height) ||
+        parseFloat(canvas.style.height) ||
+        canvas.clientHeight
       if (!pageH) return null
       const gap = 10
       const contentH = parseFloat(wrapper.style.height) || 0
@@ -985,7 +1138,10 @@ export default {
     refreshPdfThumbs() {
       const canvases = this.getPdfCanvases()
       for (const canvas of canvases) {
-        const page = Number(canvas.getAttribute('data-id'))
+        const page = Number(
+          canvas.getAttribute('data-id') ||
+            canvas.closest('[data-id]')?.getAttribute('data-id'),
+        )
         if (!page) continue
         this.capturePdfThumb(page, canvas)
       }
@@ -1206,6 +1362,7 @@ export default {
       this.pptxReadyPages = {}
       this.pdfInited = false
       this.viewZoom = VIEW_ZOOM_DEFAULT
+      this.closeExcelFind()
       console.error('渲染失败', error)
       this.loading = false
       this.hint = error?.message || '文件渲染失败，请检查 url 是否可访问，以及 resource_type 是否匹配。'
