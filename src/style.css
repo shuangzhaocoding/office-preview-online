@@ -1,0 +1,439 @@
+* {
+  margin: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app,
+#app-wrapper,
+.preview-area {
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: Inter, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: #fff;
+  color: #1f1f1f;
+}
+
+.hint {
+  max-width: 720px;
+  margin: 80px auto;
+  padding: 0 24px;
+  line-height: 1.6;
+}
+
+.hint h1 {
+  font-size: 22px;
+  margin-bottom: 12px;
+}
+
+.hint .example {
+  margin-top: 16px;
+  color: #5f6368;
+  word-break: break-all;
+}
+
+.hint code {
+  font-size: 13px;
+}
+
+.preview-area {
+  position: relative;
+  overflow: hidden;
+}
+
+.vue-office-docx,
+.vue-office-excel,
+.vue-office-pdf,
+.vue-office-pptx,
+.vue-office-pptx-main {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.preview-area > .vue-office-docx,
+.preview-area > .vue-office-excel,
+.preview-area > .vue-office-pdf,
+.preview-area > .vue-office-pptx {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* docx 自身滚动；勿被上方 overflow:hidden 盖掉 */
+.preview-area > .vue-office-docx {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.preview-area.has-page-toolbar > .vue-office-pptx,
+.preview-area.has-page-toolbar > .vue-office-pdf,
+.preview-area.has-page-toolbar > .vue-office-docx {
+  left: 148px;
+  bottom: 52px;
+  height: auto;
+  width: auto;
+}
+
+.preview-area.is-pptx:not(.has-page-toolbar) > .vue-office-pptx,
+.preview-area.is-pdf:not(.has-page-toolbar) > .vue-office-pdf,
+.preview-area.is-docx:not(.has-page-toolbar) > .vue-office-docx {
+  bottom: 52px;
+  height: auto;
+}
+
+.preview-area.is-pdf .pptx-thumb-frame,
+.preview-area.is-docx .pptx-thumb-frame {
+  aspect-ratio: 210 / 297;
+}
+
+.preview-area.is-pdf .pptx-thumb-scale img {
+  display: block;
+}
+
+.preview-area.is-docx .docx-wrapper {
+  padding: 12px 8px 20px !important;
+  box-sizing: border-box;
+}
+
+.vue-office-excel,
+.vue-office-excel-main,
+.vue-office-excel .x-spreadsheet {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.vue-office-pptx .pptx-preview-wrapper {
+  max-width: 100% !important;
+  overflow-x: hidden !important;
+}
+
+.pptx-sidebar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 12;
+  width: 148px;
+  display: flex;
+  flex-direction: column;
+  background: #14181f;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.pptx-sidebar-title {
+  flex: 0 0 auto;
+  padding: 12px 12px 8px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.72);
+  letter-spacing: 0.04em;
+}
+
+.pptx-sidebar-list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 10px 12px;
+}
+
+.pptx-thumb {
+  appearance: none;
+  display: block;
+  width: 100%;
+  margin: 0 0 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.pptx-thumb-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #2a313c;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22);
+}
+
+.pptx-thumb.active .pptx-thumb-frame {
+  border-color: #7eb6ff;
+  box-shadow: 0 0 0 1px rgba(126, 182, 255, 0.55);
+}
+
+.pptx-thumb-scale {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: top left;
+  pointer-events: none;
+}
+
+.pptx-thumb-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.pptx-thumb.ready .pptx-thumb-placeholder {
+  display: none;
+}
+
+.pptx-thumb-label {
+  margin-top: 6px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.72);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.pptx-thumb.active .pptx-thumb-label {
+  color: #7eb6ff;
+}
+
+.pptx-toolbar {
+  position: absolute;
+  left: 148px;
+  right: 0;
+  bottom: 0;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 52px;
+  padding: 0 12px;
+  background: rgba(20, 24, 31, 0.92);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  color: #fff;
+  backdrop-filter: blur(8px);
+}
+
+.toolbar-btn {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.toolbar-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.toolbar-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.toolbar-page {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.toolbar-input {
+  width: 64px;
+  height: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.28);
+  color: #fff;
+  text-align: center;
+  font-size: 13px;
+  outline: none;
+}
+
+.toolbar-input:focus {
+  border-color: rgba(126, 182, 255, 0.7);
+}
+
+.toolbar-sep,
+.toolbar-total {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 20px;
+  margin: 0 4px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.toolbar-zoom-label {
+  min-width: 64px;
+  font-variant-numeric: tabular-nums;
+}
+
+.toolbar-input::-webkit-outer-spin-button,
+.toolbar-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.toolbar-input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 65% 50% at 50% 42%, rgba(70, 92, 120, 0.35) 0%, transparent 68%),
+    radial-gradient(circle at 16% 20%, rgba(56, 96, 140, 0.28), transparent 40%),
+    radial-gradient(circle at 84% 80%, rgba(48, 88, 78, 0.22), transparent 44%),
+    linear-gradient(155deg, #14181f 0%, #1a212b 45%, #12161c 100%);
+}
+
+.loading-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.22;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: radial-gradient(circle at center, black 18%, transparent 72%);
+}
+
+.loading-circle {
+  position: relative;
+  z-index: 1;
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 28%, rgba(255, 255, 255, 0.12), transparent 48%),
+    linear-gradient(160deg, #2f3846 0%, #1c232e 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 18px 40px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  color: #fff;
+  backdrop-filter: blur(8px);
+}
+
+.progress-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.progress-ring.spin {
+  animation: ring-spin 1s linear infinite;
+}
+
+.progress-track,
+.progress-indicator {
+  fill: none;
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+
+.progress-track {
+  stroke: rgba(255, 255, 255, 0.14);
+}
+
+.progress-indicator {
+  stroke: #7eb6ff;
+  transition: stroke-dashoffset 0.12s linear;
+  filter: drop-shadow(0 0 0.5px rgba(126, 182, 255, 0.35));
+}
+
+@keyframes ring-spin {
+  from {
+    transform: rotate(-90deg);
+  }
+  to {
+    transform: rotate(270deg);
+  }
+}
+
+.loading-inner {
+  position: absolute;
+  inset: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 6px;
+}
+
+.loading-elapsed {
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+}
+
+.loading-label {
+  margin-top: 2px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.loading-size {
+  margin-top: 1px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.72);
+  font-variant-numeric: tabular-nums;
+}
+
+.loading-text {
+  font-size: 11px;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.loading-overlay.error {
+  background:
+    radial-gradient(ellipse 65% 50% at 50% 42%, rgba(120, 48, 42, 0.35) 0%, transparent 68%),
+    linear-gradient(155deg, #1c1414 0%, #241818 100%);
+}
+
+.loading-overlay.error .loading-circle {
+  background:
+    radial-gradient(circle at 35% 28%, rgba(255, 255, 255, 0.16), transparent 48%),
+    linear-gradient(160deg, #b33a32 0%, #8f2a24 100%);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.loading-overlay.error .progress-indicator {
+  stroke: rgba(255, 255, 255, 0.78);
+  filter: none;
+}
